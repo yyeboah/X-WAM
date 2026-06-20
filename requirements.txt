@@ -20,5 +20,6 @@ tyro
 omegaconf
 einops
 lightning
+tensorboard
 deepspeed>=0.16.0
 # flash-attn==2.8.3
