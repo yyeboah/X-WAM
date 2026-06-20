@@ -100,6 +100,27 @@ huggingface-cli download sharinka0715/X-WAM-RoboCasa --repo-type dataset --local
 huggingface-cli download sharinka0715/X-WAM-RoboTwin --repo-type dataset --local-dir datasets/RoboTwin
 ```
 
+For large dataset downloads with many small files, Hugging Face can return `429 Too Many Requests`.
+Use the resumable downloader below to keep concurrency low and wait out rate-limit windows:
+
+```bash
+python scripts/download_hf_stable.py sharinka0715/X-WAM-RoboTwin \
+  --repo-type dataset \
+  --local-dir datasets/RoboTwin
+```
+
+If a download stops partway through, resume from the first incomplete chunk and use a
+moderate worker count:
+
+```bash
+python scripts/download_hf_stable.py sharinka0715/X-WAM-RoboTwin \
+  --repo-type dataset \
+  --local-dir datasets/RoboTwin \
+  --chunk-from 6 \
+  --chunk-to 27 \
+  --max-workers 4
+```
+
 For Wan2.2-TI2V-5B base weights, please refer to the [official Wan2.2 repository](https://github.com/Wan-Video/Wan2.2) and place them under `checkpoints/wan22_5b/`.
 
 ---
