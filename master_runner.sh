@@ -124,6 +124,22 @@ function download_robotwin_missing_media(){
         --max-workers "${workers}"
 }
 
+function download_robotwin_media_range(){
+    local media_prefix="${1:?Usage: ./master_runner.sh download_robotwin_media_range <media_prefix> <chunk_from> [chunk_to]}"
+    local chunk_from="${2:?Usage: ./master_runner.sh download_robotwin_media_range <media_prefix> <chunk_from> [chunk_to]}"
+    local chunk_to="${3:-${chunk_from}}"
+    local local_dir="${ROBOTWIN_DIR:-datasets/RoboTwin}"
+    local workers="${ROBOTWIN_DOWNLOAD_WORKERS:-4}"
+
+    python scripts/download_hf_stable.py sharinka0715/X-WAM-RoboTwin \
+        --repo-type dataset \
+        --local-dir "${local_dir}" \
+        --chunk-prefix "${media_prefix}/chunk-" \
+        --chunk-from "${chunk_from}" \
+        --chunk-to "${chunk_to}" \
+        --max-workers "${workers}"
+}
+
 function check_robotwin_media_layout(){
     local dataset_root="${1:-sft_datasets/RoboTwin}"
     local missing=0
@@ -208,6 +224,23 @@ print(torch.cuda.device_count())
 PY
 )}"
     local master_port="${MASTER_PORT:-29500}"
+    local batch_size_per_gpu="${BATCH_SIZE_PER_GPU:-1}"
+    local accumulate_grad_batches="${ACCUMULATE_GRAD_BATCHES:-4}"
+    local num_workers_per_gpu="${NUM_WORKERS_PER_GPU:-4}"
+    local prefetch_factor="${PREFETCH_FACTOR:-2}"
+    local limit_val_batches="${LIMIT_VAL_BATCHES:-1}"
+
+    export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+
+    echo "Training launch settings:"
+    echo "  NPROC_PER_NODE=${nproc_per_node}"
+    echo "  MASTER_PORT=${master_port}"
+    echo "  BATCH_SIZE_PER_GPU=${batch_size_per_gpu}"
+    echo "  ACCUMULATE_GRAD_BATCHES=${accumulate_grad_batches}"
+    echo "  NUM_WORKERS_PER_GPU=${num_workers_per_gpu}"
+    echo "  PREFETCH_FACTOR=${prefetch_factor}"
+    echo "  LIMIT_VAL_BATCHES=${limit_val_batches}"
+    echo "  PYTORCH_CUDA_ALLOC_CONF=${PYTORCH_CUDA_ALLOC_CONF}"
 
     torchrun \
     --nnodes=1 \
@@ -219,7 +252,12 @@ PY
     dataset=robotwin \
     exp_name=robotwin_sft \
     num_warmup_steps=400 \
-    num_training_steps=40000
+    num_training_steps=40000 \
+    batch_size_per_gpu="${batch_size_per_gpu}" \
+    accumulate_grad_batches="${accumulate_grad_batches}" \
+    num_workers_per_gpu="${num_workers_per_gpu}" \
+    prefetch_factor="${prefetch_factor}" \
+    limit_val_batches="${limit_val_batches}"
 }
 
 function usage(){
@@ -232,6 +270,8 @@ Functions:
   setup_wan22 [source_dir]  Prepare checkpoints/wan22_5b
   download_robotwin_missing_media
                             Resume missing RoboTwin RGB/right-depth media
+  download_robotwin_media_range <media_prefix> <chunk_from> [chunk_to]
+                            Resume one RoboTwin media folder and chunk range
   setup_robotwin_dataset_link [source] [dest]
                             Link downloaded RoboTwin data into sft_datasets/
 
@@ -243,6 +283,12 @@ Wan2.2 setup options:
 Training options:
   NPROC_PER_NODE=8
   MASTER_PORT=29500
+  BATCH_SIZE_PER_GPU=1
+  ACCUMULATE_GRAD_BATCHES=4
+  NUM_WORKERS_PER_GPU=4
+  PREFETCH_FACTOR=2
+  LIMIT_VAL_BATCHES=1
+  PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 Download options:
   ROBOTWIN_DIR=datasets/RoboTwin
@@ -253,7 +299,9 @@ Examples:
   ./master_runner.sh setup_wan22 /path/to/Wan2.2-TI2V-5B
   ./master_runner.sh setup_robotwin_dataset_link
   ./master_runner.sh download_robotwin_missing_media
+  ./master_runner.sh download_robotwin_media_range video/head_camera 21 27
   NPROC_PER_NODE=4 ./master_runner.sh run_training
+  BATCH_SIZE_PER_GPU=2 ACCUMULATE_GRAD_BATCHES=2 ./master_runner.sh run_training
 EOF
 }
 
@@ -266,7 +314,7 @@ function main(){
     fi
 
     case "${command}" in
-        run_training|setup_wan22|setup_robotwin_dataset_link|preflight_training|download_robotwin_missing_media)
+        run_training|setup_wan22|setup_robotwin_dataset_link|preflight_training|download_robotwin_missing_media|download_robotwin_media_range)
             "${command}" "$@"
             ;;
         gpu_diagnostics)
